@@ -1,1 +1,1 @@
-# POLI-784
+# POLI 784: Regression Models
