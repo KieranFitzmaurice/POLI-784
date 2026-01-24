@@ -59,9 +59,15 @@ answer_strategy <- declare_estimator(Y ~ Z, .method=difference_in_means, inquiry
 # Combine different components of research design into a "declaration" object
 declaration_3A <- model + inquiry + data_strategy + answer_strategy
 
-# Display simulated data
-head(draw_data(design = declaration_3A))
+# Simulate data
+table_data <- tail(draw_data(design = declaration_3A),10)
 
+# Save as latex table 
+latex_table <- kable(table_data, format="latex", booktabs=TRUE)
+writeLines(latex_table, con = "table_3A.tex")
+
+# Display to console
+table_data
 ```
 
 ## Part B
@@ -253,6 +259,7 @@ As shown in the above plot, the power of our study design is highly sensitive to
 
 ## Part E
 
+Given that the performance of our study design appears sensitive to both the sample size $n$ and average treatment effect $\tau$, we will now consider how varying these two parameters simultaneously affects key metrics such as statistical power.
 
 ```{r question-3e, eval=TRUE}
 
@@ -308,14 +315,13 @@ table_data
 p
 ```
 
-The "optimal" sample size for the company's study is likely to depend on the following factors: 
+The "optimal" sample size for the company's study is likely to depend on the following factors:
 
-1. The value of the average treatment effect $\tau$. 
-2. The cost of running the study for a given sample size $n$. 
-3. The cost of making a type I error (i.e., adopting an AI tool that does not provide meaningful productivity gains.)
-4. The cost of making a type II error (i.e., failing to adopt an AI tool that provides meaningful productivity gains.)
+1.  The value of the average treatment effect $\tau$.
+2.  The cost of running the study for a given sample size $n$.
+3.  The cost of making a type I error (i.e., adopting an AI tool that does not provide meaningful productivity gains.)
+4.  The cost of making a type II error (i.e., failing to adopt an AI tool that provides meaningful productivity gains.)
 
-If we were able to quantify items 2-4, we could create a custom `diagnosand` that represents the expected net monetary benefits to the company of making a decision based on a given study design. This could then be used to determine the sample size that maximizes expected profits. 
+If we were able to quantify items 2-4, we could create a custom `diagnosand` that represents the expected net monetary benefits to the company of making a decision based on a given study design. This could then be used to determine the sample size that maximizes expected profits.
 
-In our opinion, the expected costs (in terms of foregone profits) associated with making a type I or type II error are likely to far exceed the cost of running most of the study designs considered in this analysis, particularly if the company is considering a long-term contract with the provider of the AI tool. As such, we would recommend that the company conduct their study using a larger sample size of $n=350$ or more. This sample size should be sufficient to detect an effect size of $\tau = 0.25$ with almost 80% power (Fig. 3c) and an effect size of $\tau > 0.3$ with over 90% power (Fig. 3d). 
-
+In our opinion, the expected costs (in terms of foregone profits) associated with making a type I or type II error are likely to far exceed the cost of running most of the study designs considered in this analysis, particularly if the company is considering a long-term contract with the provider of the AI tool. As such, we would recommend that the company conduct their study using a larger sample size of $n=350$ or more. This sample size should be sufficient to detect an effect size of $\tau = 0.25$ with almost 80% power (Fig. 3c) and an effect size of $\tau > 0.3$ with over 90% power (Fig. 3d).
