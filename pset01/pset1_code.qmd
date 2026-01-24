@@ -120,7 +120,9 @@ designs_by_n <- redesign(declaration_3A, n = sample_size_options)
 
 # Evaluate performance of alternative designs using same metrics as before. 
 # To reduce computation time, cut number of simulations per design in half. 
-diagnose_by_n <- diagnose_designs(designs_by_n, diagnosands=diagnosands,sims=500)
+diagnose_by_n <- diagnose_designs(designs_by_n,
+                                  diagnosands=diagnosands,
+                                  sims=500)
 
 # Tidy result into a summary dataframe and filter by quantities of interest
 diagnose_by_n <- tidy(diagnose_by_n) %>% filter(diagnosand %in% c('bias','power','coverage'))
@@ -250,3 +252,70 @@ p
 As shown in the above plot, the power of our study design is highly sensitive to the size of the average treatment effect $\tau$. With a sample size of $n=150$, the minimum effect size that our study can detect with at least 80% power is approximately $\tau=0.4$.
 
 ## Part E
+
+
+```{r question-3e, eval=TRUE}
+
+# Vary sample size and effect size simultaneously
+designs_3E <- redesign(declaration_3A, n = c(150,250,350), tau = c(0.2,0.3,0.4))
+
+# Evaluate performance under different scenarios 
+diagnoses_3E <- diagnose_designs(designs_3E,
+                                 diagnosands=diagnosands,
+                                 sims=500)
+
+# Tidy result into a summary dataframe and filter by quantities of interest
+diagnoses_3E <- tidy(diagnoses_3E) %>% filter(diagnosand %in% c('bias','power','coverage'))
+
+# Save as latex table
+table_data <- pivot_wider(data=diagnoses_3E, 
+                          id_cols = c(design,n,tau), 
+                          values_from = estimate, 
+                          names_from = diagnosand)
+
+latex_table <- kable(table_data, format="latex", booktabs=TRUE)
+writeLines(latex_table, con = "table_3E.tex")
+
+# Create figure showing power varies as a function of sample size 
+# stratified by effect size. 
+table_data$tau <- as.factor(table_data$tau)
+
+p <- ggplot(table_data,
+            aes(x = n,
+                y = power,
+                color = tau)) + 
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(breaks = seq(0, 1, 0.2)) +
+  coord_cartesian(ylim = c(0, 1),xlim = c(150,350)) +
+  labs(
+    x = "Sample size (n)",
+    y = "Power",
+    title = "Power vs. sample size by effect size") +
+  theme_minimal()
+
+# Save figure as png
+ggsave(
+  filename = "figure_3E.png",
+  plot = p,
+  width = 6,
+  height = 4,
+  dpi = 350
+)
+
+# Displate results to console
+table_data
+p
+```
+
+The "optimal" sample size for the company's study is likely to depend on the following factors: 
+
+1. The value of the average treatment effect $\tau$. 
+2. The cost of running the study for a given sample size $n$. 
+3. The cost of making a type I error (i.e., adopting an AI tool that does not provide meaningful productivity gains.)
+4. The cost of making a type II error (i.e., failing to adopt an AI tool that provides meaningful productivity gains.)
+
+If we were able to quantify items 2-4, we could create a custom `diagnosand` that represents the expected net monetary benefits to the company of making a decision based on a given study design. This could then be used to determine the sample size that maximizes expected profits. 
+
+In our opinion, the expected costs (in terms of foregone profits) associated with making a type I or type II error are likely to far exceed the cost of running most of the study designs considered in this analysis, particularly if the company is considering a long-term contract with the provider of the AI tool. As such, we would recommend that the company conduct their study using a larger sample size of $n=350$ or more. This sample size should be sufficient to detect an effect size of $\tau = 0.25$ with almost 80% power (Fig. 3c) and an effect size of $\tau > 0.3$ with over 90% power (Fig. 3d). 
+
