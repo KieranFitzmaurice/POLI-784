@@ -1,0 +1,114 @@
+---
+title: "POLI 784 - Problem Set #1"
+author: "Yiheng Chen, Kieran Fitzmason, Kat Gruschow"
+date: today
+format: html
+---
+
+# Question 1
+
+In this question, we examine the conditions under which the Horvitz-Thompson (HT) and Hajek (HA) estimators are equivalent to the difference-in-means (DIM) estimator. We represent the DIM estimator as follows:
+
+$$ \hat{\tau}_{DIM} = \bar{Y_t} - \bar{Y_c} = \frac{\sum_{i=1}^{N} D_i Y_i}{\sum_{i=1}^{N} D_i} - \frac{\sum_{i=1}^{N} (1-D_i) Y_i}{\sum_{i=1}^{N} (1-D_i)} $${#eq-dim}
+
+where $N$ is the sample size, $D_i$ is a binary variable denoting whether a unit was assigned to treatment ($D_i=1$) or control ($D_i=0$) and $Y_i$ is the observed outcome of each unit.
+
+## Part A
+
+The canonical form of the HT estimator is as follows:
+
+$$
+\hat{\tau}_{HT} = \frac{1}{N}\sum_{i=1}^{N}\left(\frac{D_i Y_i}{p_i} - \frac{(1-D_i)Y_i}{(1-p_i)}\right)
+$${#eq-ht-canonical}
+
+where $p_i$ is the probability of an individual unit being assigned to treatment. When a fixed number $N_t$ of $N$ units are assigned to treatment, we can re-write the probability of being assigned to treatment or control as follows:
+
+$$
+p_i = \frac{N_t}{N}
+$${#eq-ht-treatment-prob}
+
+$$
+1-p_i = 1 - \frac{N_t}{N} = \frac{N - N_t}{N} = \frac{N_c}{N}
+$${#eq-ht-control-prob}
+
+where $N_t$ and $N_c$ are the number of treated and control units respectively. By substituting @eq-ht-treatment-prob and @eq-ht-control-prob into @eq-ht-canonical, we can rewrite the HT estimator as follows:
+
+$$
+\hat{\tau}_{HT} = \frac{1}{N}\sum_{i=1}^{N}\left(\frac{D_i Y_i}{N_t/N} - \frac{(1-D_i)Y_i}{N_c/N}\right) = \frac{1}{N_t}\sum_{i=1}^{N}D_iY_i - \frac{1}{N_c}\sum_{i=1}^{N}(1-D_i)Y_i
+$${#eq-ht-substitution}
+
+By recognizing that we can rewrite $N_t$ and $N_c$ as the summation of $D_i$ and $(1-D_i)$ respectively, we can reduce @eq-ht-substitution into a form that is equivalent to the DIM estimator:
+
+$$
+\hat{\tau}_{HT} = \frac{\sum_{i=1}^{N} D_i Y_i}{\sum_{i=1}^{N} D_i} - \frac{\sum_{i=1}^{N} (1-D_i) Y_i}{\sum_{i=1}^{N} (1-D_i)}
+$${#eq-ht-equivalent}
+
+This equivalence should hold for complete random assignment since this treatment assignment mechanism ensures that $N_t$ and $p_i$ are both fixed constants. It will not hold for simple random assignment because $N_t$ is a binomially distributed random variable and not a fixed constant under this assignment mechanism.
+
+## Part B
+
+The canonical form of the HA estimator is as follows:
+
+$$
+\hat{\tau}_{HA} = \frac{\left(\sum_{i=1}^{N}\frac{D_iY_i}{p_i}\right)}{\left(\sum_{i=1}^{N}\frac{D_i}{p_i}\right)} - \frac{\left(\sum_{i=1}^{N}\frac{(1-D_i)Y_i}{(1-p_i)}\right)}{\left(\sum_{i=1}^{N}\frac{(1-D_i)}{(1-p_i)}\right)}
+$${#eq-hajek-canonical}
+
+When $p_i = p$ for all units, @eq-hajek-canonical can be rewritten as:
+
+$$
+\hat{\tau}_{HA} = \frac{\frac{1}{p}\sum_{i=1}^{N}D_iY_i}{\frac{1}{p}\sum_{i=1}^{N}D_i} - \frac{\frac{1}{1-p}\sum_{i=1}^{N}(1-D_i)Y_i}{\frac{1}{1-p}\sum_{i=1}^{N}(1-D_i)}
+$${#eq-hajek-constant-p}
+
+By cancelling out the $1/p$ and $1/(1-p)$ terms that appear the both the numerator and denominator of the fractions in @eq-hajek-constant-p, we can reduce the Hajek estimator to a form that is equivalent to the DIM estimator:
+
+$$
+\hat{\tau}_{HA} = \frac{\sum_{i=1}^{N} D_i Y_i}{\sum_{i=1}^{N} D_i} - \frac{\sum_{i=1}^{N} (1-D_i) Y_i}{\sum_{i=1}^{N} (1-D_i)}
+$${#eq-hajek-equivalent}
+
+This equivalence should hold for simple random assignment and for complete random assignment because the probability of being assigned to treatment is equal to a fixed constant $p$ for all units under both of these assignment mechanisms. In the case of complete random assignment, $p=N_t / N$.
+
+# Question 3
+
+In this excercise, we analyze data from a study by [Santoro and Broockman (2022)](https://doi.org/10.1126/sciadv.abn5515) examining the effect of conversations between strangers of opposing political parties on measures of polarization. During their conversation, subjects talked about what their perfect day would look like. Subjects assigned to treatment (\$D_i=1\$) were informed prior to the start of the conversation that their partner was an out-partisan, while those assigned to control (\$D_i=0\$) were not informed of this. The primary outcome of interest $Y_i$ was self-reported warmth towards outpartisans measured on a feeling thermometer. 
+
+
+# Part A
+
+```{r question-3a, eval=TRUE}
+
+# Load required packages. 
+library(tidyverse)
+
+# Set random seed for reproducibility. 
+set.seed(42)
+
+# Load data. 
+df <- read.csv("data.csv")
+
+# Rename columns to be consistent with notation used elsewhere in this document. 
+colnames(df) <- c("Y","D")
+
+# Compute ATE point estimate using Neyman DIM estimator. 
+ATE <- mean(df$Y[df$D==1]) - mean(df$Y[df$D==0])
+
+# Compute standard error using Neyman variance estimator. This estimator is 
+# conservative and tends to return values that are larger than the true variance. 
+St <- sd(df$Y[df$D==1])
+Sc <- sd(df$Y[df$D==0])
+Nt <- sum(df$D)
+Nc <- sum(1-df$D)
+var_neyman <- St^2/Nt + Sc^2/Nc
+
+# Compute 95% confidence interval using Neyman variance estimate. 
+alpha <- 0.05
+z <- qnorm(1-alpha/2)
+ATE_LB_neyman <- ATE - z*sqrt(var_neyman)
+ATE_UB_neyman <- ATE + z*sqrt(var_neyman)
+
+# Print results
+print(paste("ATE point estimate: ",round(ATE,6)))
+print(paste("Neyman variance estimate: ",round(var_neyman,6)))
+print(paste("95% confidence interval: ",round(ATE_LB_neyman,6),"-",round(ATE_UB_neyman,6)))
+
+
+```
