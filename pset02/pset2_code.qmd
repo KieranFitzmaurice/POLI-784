@@ -9,7 +9,7 @@ format: html
 
 In this question, we examine the conditions under which the Horvitz-Thompson (HT) and Hajek (HA) estimators are equivalent to the difference-in-means (DIM) estimator. We represent the DIM estimator as follows:
 
-$$ \hat{\tau}_{DIM} = \bar{Y_t} - \bar{Y_c} = \frac{\sum_{i=1}^{N} D_i Y_i}{\sum_{i=1}^{N} D_i} - \frac{\sum_{i=1}^{N} (1-D_i) Y_i}{\sum_{i=1}^{N} (1-D_i)} $${#eq-dim}
+$$ \hat{\tau}_{DIM} = \bar{Y_t} - \bar{Y_c} = \frac{\sum_{i=1}^{N} D_i Y_i}{\sum_{i=1}^{N} D_i} - \frac{\sum_{i=1}^{N} (1-D_i) Y_i}{\sum_{i=1}^{N} (1-D_i)} $$ {#eq-dim}
 
 where $N$ is the sample size, $D_i$ is a binary variable denoting whether a unit was assigned to treatment ($D_i=1$) or control ($D_i=0$) and $Y_i$ is the observed outcome of each unit.
 
@@ -19,29 +19,29 @@ The canonical form of the HT estimator is as follows:
 
 $$
 \hat{\tau}_{HT} = \frac{1}{N}\sum_{i=1}^{N}\left(\frac{D_i Y_i}{p_i} - \frac{(1-D_i)Y_i}{(1-p_i)}\right)
-$${#eq-ht-canonical}
+$$ {#eq-ht-canonical}
 
 where $p_i$ is the probability of an individual unit being assigned to treatment. When a fixed number $N_t$ of $N$ units are assigned to treatment, we can re-write the probability of being assigned to treatment or control as follows:
 
 $$
 p_i = \frac{N_t}{N}
-$${#eq-ht-treatment-prob}
+$$ {#eq-ht-treatment-prob}
 
 $$
 1-p_i = 1 - \frac{N_t}{N} = \frac{N - N_t}{N} = \frac{N_c}{N}
-$${#eq-ht-control-prob}
+$$ {#eq-ht-control-prob}
 
 where $N_t$ and $N_c$ are the number of treated and control units respectively. By substituting @eq-ht-treatment-prob and @eq-ht-control-prob into @eq-ht-canonical, we can rewrite the HT estimator as follows:
 
 $$
 \hat{\tau}_{HT} = \frac{1}{N}\sum_{i=1}^{N}\left(\frac{D_i Y_i}{N_t/N} - \frac{(1-D_i)Y_i}{N_c/N}\right) = \frac{1}{N_t}\sum_{i=1}^{N}D_iY_i - \frac{1}{N_c}\sum_{i=1}^{N}(1-D_i)Y_i
-$${#eq-ht-substitution}
+$$ {#eq-ht-substitution}
 
 By recognizing that we can rewrite $N_t$ and $N_c$ as the summation of $D_i$ and $(1-D_i)$ respectively, we can reduce @eq-ht-substitution into a form that is equivalent to the DIM estimator:
 
 $$
 \hat{\tau}_{HT} = \frac{\sum_{i=1}^{N} D_i Y_i}{\sum_{i=1}^{N} D_i} - \frac{\sum_{i=1}^{N} (1-D_i) Y_i}{\sum_{i=1}^{N} (1-D_i)}
-$${#eq-ht-equivalent}
+$$ {#eq-ht-equivalent}
 
 This equivalence should hold for complete random assignment since this treatment assignment mechanism ensures that $N_t$ and $p_i$ are both fixed constants. It will not hold for simple random assignment because $N_t$ is a binomially distributed random variable and not a fixed constant under this assignment mechanism.
 
@@ -51,28 +51,41 @@ The canonical form of the HA estimator is as follows:
 
 $$
 \hat{\tau}_{HA} = \frac{\left(\sum_{i=1}^{N}\frac{D_iY_i}{p_i}\right)}{\left(\sum_{i=1}^{N}\frac{D_i}{p_i}\right)} - \frac{\left(\sum_{i=1}^{N}\frac{(1-D_i)Y_i}{(1-p_i)}\right)}{\left(\sum_{i=1}^{N}\frac{(1-D_i)}{(1-p_i)}\right)}
-$${#eq-hajek-canonical}
+$$ {#eq-hajek-canonical}
 
 When $p_i = p$ for all units, @eq-hajek-canonical can be rewritten as:
 
 $$
 \hat{\tau}_{HA} = \frac{\frac{1}{p}\sum_{i=1}^{N}D_iY_i}{\frac{1}{p}\sum_{i=1}^{N}D_i} - \frac{\frac{1}{1-p}\sum_{i=1}^{N}(1-D_i)Y_i}{\frac{1}{1-p}\sum_{i=1}^{N}(1-D_i)}
-$${#eq-hajek-constant-p}
+$$ {#eq-hajek-constant-p}
 
 By cancelling out the $1/p$ and $1/(1-p)$ terms that appear the both the numerator and denominator of the fractions in @eq-hajek-constant-p, we can reduce the Hajek estimator to a form that is equivalent to the DIM estimator:
 
 $$
 \hat{\tau}_{HA} = \frac{\sum_{i=1}^{N} D_i Y_i}{\sum_{i=1}^{N} D_i} - \frac{\sum_{i=1}^{N} (1-D_i) Y_i}{\sum_{i=1}^{N} (1-D_i)}
-$${#eq-hajek-equivalent}
+$$ {#eq-hajek-equivalent}
 
 This equivalence should hold for simple random assignment and for complete random assignment because the probability of being assigned to treatment is equal to a fixed constant $p$ for all units under both of these assignment mechanisms. In the case of complete random assignment, $p=N_t / N$.
 
 # Question 3
 
-In this excercise, we analyze data from a study by [Santoro and Broockman (2022)](https://doi.org/10.1126/sciadv.abn5515) examining the effect of conversations between strangers of opposing political parties on measures of polarization. During their conversation, subjects talked about what their perfect day would look like. Subjects assigned to treatment (\$D_i=1\$) were informed prior to the start of the conversation that their partner was an out-partisan, while those assigned to control (\$D_i=0\$) were not informed of this. The primary outcome of interest $Y_i$ was self-reported warmth towards outpartisans measured on a feeling thermometer. 
+In this excercise, we analyze data from a study by [Santoro and Broockman (2022)](https://doi.org/10.1126/sciadv.abn5515) examining the effect of conversations between strangers of opposing political parties on measures of polarization. During their conversation, subjects talked about what their perfect day would look like. Subjects assigned to treatment ($D_i=1$) were informed prior to the start of the conversation that their partner was an out-partisan, while those assigned to control ($D_i=0$) were not informed of this. The primary outcome of interest $Y_i$ was self-reported warmth towards outpartisans measured on a feeling thermometer.
 
+## Part A
 
-# Part A
+Here, we compute the ATE using the Neyman difference-in-means estimator (\@eq-dim). The formula for the corresponding Neyman variance estimate is given by:
+
+$$
+\hat{\mathbb{V}}\left[\hat{\tau}_{DIM}\right] = \frac{s_t^2}{N_t} + \frac{s_c^2}{N_c}
+$$
+
+This estimate of the variance is conservative and will tend to overestimate the uncertainty in estimates of $\hat{\tau}$. This variance estimate can be used to construct confidence intervals as follows:
+
+$$
+CI^{1-\alpha}(\hat{\tau}_{DIM}) = \hat{\tau} \pm z_{1-\alpha/2} \sqrt{\hat{\mathbb{V}}\left[\hat{\tau}_{DIM}\right]}
+$$
+
+where $\alpha$ is the chosen significance level and $z_{1-\alpha/2}$ is the corresponding quantile of a standard normal distribution.
 
 ```{r question-3a, eval=TRUE}
 
@@ -89,7 +102,7 @@ df <- read.csv("data.csv")
 colnames(df) <- c("Y","D")
 
 # Compute ATE point estimate using Neyman DIM estimator. 
-ATE <- mean(df$Y[df$D==1]) - mean(df$Y[df$D==0])
+ATE_DIM <- mean(df$Y[df$D==1]) - mean(df$Y[df$D==0])
 
 # Compute standard error using Neyman variance estimator. This estimator is 
 # conservative and tends to return values that are larger than the true variance. 
@@ -97,18 +110,78 @@ St <- sd(df$Y[df$D==1])
 Sc <- sd(df$Y[df$D==0])
 Nt <- sum(df$D)
 Nc <- sum(1-df$D)
-var_neyman <- St^2/Nt + Sc^2/Nc
+ATE_DIM_VAR <- St^2/Nt + Sc^2/Nc
 
 # Compute 95% confidence interval using Neyman variance estimate. 
 alpha <- 0.05
 z <- qnorm(1-alpha/2)
-ATE_LB_neyman <- ATE - z*sqrt(var_neyman)
-ATE_UB_neyman <- ATE + z*sqrt(var_neyman)
+ATE_DIM_LB <- ATE_DIM - z*sqrt(ATE_DIM_VAR)
+ATE_DIM_UB <- ATE_DIM + z*sqrt(ATE_DIM_VAR)
 
 # Print results
-print(paste("ATE point estimate: ",round(ATE,6)))
-print(paste("Neyman variance estimate: ",round(var_neyman,6)))
-print(paste("95% confidence interval: ",round(ATE_LB_neyman,6),"-",round(ATE_UB_neyman,6)))
+print(paste("ATE point estimate: ",round(ATE_DIM,6)))
+print(paste("Neyman variance estimate: ",round(ATE_DIM_VAR,6)))
+print(paste("95% confidence interval: ",round(ATE_DIM_LB,6),"-",round(ATE_DIM_UB,6)))
 
+
+```
+
+## Part B
+
+Here, we compare the confidence intervals computed using the Neyman variance estimator to those constructed via bootstrapping. The bootstrapping procedure can be summarized as follows:
+
+1.  Create a resampled dataset by drawing $N$ samples from the original dataset *with replacement*.
+
+2.  Estimate $\hat{\tau}_{boot}$ by applying the DIM estimator to the resampled data.
+
+3.  Repeat steps (1) and (2) many times. The resulting distribution of $\hat{\tau}_{boot}$ should approximate the sampling distribution of $\hat{\tau}_{DIM}$ and can be used to construct confidence intervals on the average treatment effect.
+
+A nonparametric way to construct bootstrapped confidence intervals is by taking the $\alpha/2$ and $1-\alpha/2$ quantiles of the empirical distribution of $\hat{\tau}_{boot}$.
+
+$$
+CI^{1-\alpha} = \left[ Q_{\alpha/2}(\hat{\tau}_{boot}),Q_{1-\alpha/2}(\hat{\tau}_{boot})\right]
+$$
+
+Alternatively, because it can be shown that $\hat{\tau}_{boot}$ is normally distributed based on the [central limit theorem](https://en.wikipedia.org/wiki/Central_limit_theorem) and [sum of normally distributed random variables](https://en.wikipedia.org/wiki/Sum_of_normally_distributed_random_variables), we can also construct confidence intervals using the normal approximation:
+
+$$
+CI^{1-\alpha} = \hat{\tau}_{DIM} \pm z_{1-\alpha/2} \sqrt{\mathbb{V}\left[\hat{\tau}_{boot}\right]}
+$$
+
+```{r question-3b, eval=TRUE}
+
+# Set random seed for reproducibility. 
+set.seed(42)
+
+# Specify number of bootstrapping iterations
+B <- 1000
+
+# Specify number of samples in dataset
+N <- nrow(df)
+
+# Initialize vector to hold bootstrapped estimates of ATE
+ATE_BOOT_DIST <- rep(NA,B)
+
+for (j in 1:B){
+  df_boot <- slice_sample(df, n = N, replace = TRUE)
+  ATE_BOOT_DIST[j] <- mean(df_boot$Y[df_boot$D==1]) - mean(df_boot$Y[df_boot$D==0])
+}
+
+# Compute bootstrapped CI using the percentile method
+ATE_BOOT_PERC_LB <- quantile(ATE_BOOT_DIST,alpha/2)
+ATE_BOOT_PERC_UB <- quantile(ATE_BOOT_DIST,1-alpha/2)
+
+# Compute bootstrapped CI using the normal approximation method
+ATE_BOOT_VAR <- var(ATE_BOOT_DIST)
+ATE_BOOT_NORM_LB <- ATE_DIM - z*sqrt(ATE_BOOT_VAR)
+ATE_BOOT_NORM_UB <- ATE_DIM + z*sqrt(ATE_BOOT_VAR)
+
+# Dump results into a dataframe that we'll use for plotting
+results_df <- tibble(
+  method=c("Neyman","Bootstrapped - Percentile","Bootstrapped - Normal"),
+  estimate=c(ATE_DIM,ATE_DIM,ATE_DIM),
+  conf.low=c(ATE_DIM_LB,ATE_BOOT_PERC_LB,ATE_BOOT_NORM_LB),
+  conf.high=c(ATE_DIM_UB,ATE_BOOT_PERC_UB,ATE_BOOT_NORM_UB)
+)
 
 ```
