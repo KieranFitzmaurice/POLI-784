@@ -162,8 +162,13 @@ N <- nrow(df)
 # Initialize vector to hold bootstrapped estimates of ATE
 ATE_BOOT_DIST <- rep(NA,B)
 
+# Repeatedly resample data to get bootstrapped distribution of ATE
 for (j in 1:B){
+  
+  # Resample data with replacement
   df_boot <- slice_sample(df, n = N, replace = TRUE)
+  
+  # Compute ATE using DIM estimator
   ATE_BOOT_DIST[j] <- mean(df_boot$Y[df_boot$D==1]) - mean(df_boot$Y[df_boot$D==0])
 }
 
@@ -184,4 +189,94 @@ results_df <- tibble(
   conf.high=c(ATE_DIM_UB,ATE_BOOT_PERC_UB,ATE_BOOT_NORM_UB)
 )
 
+# Create coefficient plot
+p <- ggplot(results_df, aes(x = estimate, y = method)) +
+  geom_point(size = 3) +
+  geom_errorbar(
+    aes(xmin = conf.low, xmax = conf.high),
+    height = 0.15
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "gray50") +
+  labs(
+    x = "Average Treatment Effect",
+    y = NULL,
+    title = "95% Confidence Interval By Method"
+  ) +
+  theme_minimal()
+
+# Display to console
+p
+
 ```
+
+As shown in the above plot, our estimate of the ATE is statistically significant at the $\alpha=0.05$ level under all three evaluated methods of constructing confidence intervals.
+
+## Part C
+
+Here, we use Fisher's randomization test (FRT) to construct the distribution of ATE estimates under the sharp null hypothesis:
+
+$$
+H_0: Y_i(0) = Y_i(1) = Y_i^{obs} \space \forall i
+$$
+
+This is done by repeatedly estimating the ATE under randomly-generated treatment assignment vectors. By comparing our actual ATE estimate to this null distribution, we can compute a p-value which represents the probability of observing a result this extreme under the sharp null hypothesis.
+
+```{r question-3c, eval=TRUE}
+
+# Set random seed for reproducibility. 
+set.seed(42)
+
+# Specify probability of treatment assignment
+prob_treatment <- mean(df$D)
+
+# Initialize vector to hold estimates of ATE under sharp null hypothesis
+ATE_FRT_DIST <- rep(NA,B)
+
+# Compute null distribution of ATE using Fisher randomization approach
+for (j in 1:B){
+  
+  # Randomize treatment assignments
+  # (breaks relationship between treatment assignment and outcome of interest)
+  D_FRT <- rbinom(N,1,prob_treatment)
+  
+  # Compute ATE using DIM estimator and randomized treatment assignment vector
+  ATE_FRT_DIST[j] <- mean(df$Y[D_FRT==1]) - mean(df$Y[D_FRT==0])
+}
+
+# Compute 1-alpha/2 percentile of null ATEs
+critical_value = quantile(ATE_FRT_DIST,1-alpha/2)
+
+# Plot null distribution of ATEs against our point estimate
+p <- ggplot(data.frame(ATE_FRT_DIST), aes(x = ATE_FRT_DIST)) +
+  geom_density(
+    fill = "gray70",
+    alpha = 0.6,
+    linewidth = 0.8
+  ) +
+  geom_vline(
+    xintercept = critical_value,
+    linetype = "dashed",
+    linewidth = 1
+  ) +
+  geom_vline(
+    xintercept = ATE_DIM,
+    linetype = "solid",
+    linewidth = 1
+  ) +
+  labs(
+    x = "ATE under sharp null",
+    y = "Density",
+    title = "Null Distribution of ATE Estimates",
+    subtitle = "Dashed line: 97.5th percentile of null; Solid line: observed ATE"
+  ) +
+  theme_minimal()
+
+# Display to console
+p
+
+# Compute p-value for ATE estimate under sharp null
+FRT_pval <- mean(abs(ATE_FRT_DIST) > abs(ATE_DIM))
+print(paste("P-value of ATE estimate under sharp null hypothesis: ",round(FRT_pval,6)))
+```
+
+We can reject the null hypothesis since our observed ATE estimate is more extreme than the $1-\alpha/2$ quantile of ATE estimates under the sharp null hypothesis. This is consistent with our findings from Part B, in which the weak null hypothesis of no average treatment effect was rejected. If the sharp null hypothesis were true, then we would also expect the weak null hypothesis to be satisfied.
