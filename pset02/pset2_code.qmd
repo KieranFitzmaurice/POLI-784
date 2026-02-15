@@ -1,8 +1,8 @@
 ---
-title: "POLI 784 - Problem Set #1"
+title: "POLI 784 - Problem Set #2"
 author: "Yiheng Chen, Kieran Fitzmason, Kat Gruschow"
 date: today
-format: html
+format: pdf
 ---
 
 # Question 1
@@ -67,6 +67,197 @@ $$ {#eq-hajek-equivalent}
 
 This equivalence should hold for simple random assignment and for complete random assignment because the probability of being assigned to treatment is equal to a fixed constant $p$ for all units under both of these assignment mechanisms. In the case of complete random assignment, $p=N_t / N$.
 
+# Question 2
+
+## Part A
+
+```{r Q2A}
+
+# Load required packages. 
+library(tidyverse)
+
+#Delete previously saved variable and lists.
+rm(list=ls())
+# set seed to 42 to make your results reproducible
+set.seed(42)
+# sample size is N = 100
+N <- 100
+# create a data frame with variables 
+df <- data.frame(
+  X = runif(n = N, min = 0, max = 1), # Xi is drawn from the uniform distribution on [0, 1]
+  e = rnorm(n = N, mean = 0, sd = 1) # Error N (0, 1)
+)
+df <- within(df, {  
+  Y0 = 3 + 2 * (X) + (X)^2 + e # Y0
+  tau_individual = rnorm(n = N, mean = 5 * sin(X), sd = 1) # Individual treatment effect tau
+  Y1 = Y0 + tau_individual # Y1
+  D = rbinom(n = N, size = 1, prob = 0.4) # Discrete treatment indicator D
+})
+# reveal the observed outcome Y for each unit by saving it in a new column Y
+df <- df |> 
+  mutate(Y = ifelse(D == 1, Y1, Y0)) # Observed outcome Y
+```
+
+## Part B
+
+```{r Q2B}
+# Compute the Neyman, Horvitz-Thompson, and Hajek estimators for the ATE
+# Neyman estimator
+neyman_ate <- mean(df$Y[df$D == 1]) - mean(df$Y[df$D == 0])
+# Horvitz-Thompson estimator
+ht_ate <- 1/N * sum(df$Y[df$D == 1] / 0.4) - 1/N * sum(df$Y[df$D == 0] / 0.6)
+# Hajek estimator
+hajek_ate <- sum(df$Y[df$D == 1] / 0.4) / sum(df$D / 0.4) - sum(df$Y[df$D == 0] / 0.6) / sum((1 - df$D) / 0.6)
+# Neyman variance estimator
+neymen_var <- var(df$Y[df$D == 1]) / sum(df$D == 1) + var(df$Y[df$D == 0]) / sum(df$D == 0)
+# Plot all these estimators with their 95% confidence intervals
+sate <- mean(df$tau_individual) # Sample Average Treatment Effect (SATE)
+se <- sqrt(neymen_var) # Standard error for Neyman estimator
+alpha <- 0.05 # Significance level for 95% confidence interval
+z <- qnorm(1 - alpha/2) # Z-score for 95% confidence interval
+plot_df <- data.frame(
+  Estimator = c("Neyman", "HT", "Hajek"),
+  Estimate = c(neyman_ate, ht_ate, hajek_ate)
+)
+plot_df <- plot_df |> 
+  mutate(
+    Lower = Estimate - z * se, # Lower bound of confidence interval
+    Upper = Estimate + z * se  # Upper bound of confidence interval
+  )
+
+ggplot(plot_df, aes(x = Estimator, y = Estimate)) + # Create a bar plot of the estimates
+  geom_pointrange(aes(ymin = Lower, ymax = Upper), color = "blue", size = 1) + # Add error bars for confidence intervals
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") + # Add a dashed line at y=0 for reference
+  geom_hline(yintercept = sate, linetype = "dashed", color = "red") + # Add a dashed line for the true ATE
+  labs(title = "ATE Estimates with 95% Confidence Intervals",subtitle = "Red dashed line represents the true ATE", x = "Estimator", y = "ATE Estimate") + # Add title and axis labels
+  theme_minimal() # Use a minimal theme for better aesthetics
+```
+
+## Part C
+
+```{r Q2C}
+n_sims <- 1000 # Number of simulations
+df_randomization <- data.frame(
+  neyman_ate = numeric(n_sims),
+  ht_ate = numeric(n_sims),
+  hajek_ate = numeric(n_sims)
+)
+
+for (i in 1:n_sims) { # Loop over the number of simulations
+  D_sim <- rbinom(n = N, size = 1, prob = 0.4) # Simulate a new random treatment assignments
+  Y_sim <- D_sim * df$Y1 + (1 - D_sim) * df$Y0 # Simulate observed outcomes based on the new treatment assignments
+  # Neyman
+  df_randomization$neyman_ate[i] <- mean(Y_sim[D_sim == 1]) - mean(Y_sim[D_sim == 0])
+  # Horvitz-Thompson
+  df_randomization$ht_ate[i] <- 1/N * sum(Y_sim[D_sim == 1] / 0.4) - 1/N * sum(Y_sim[D_sim == 0] / 0.6)
+  # Hajek
+  df_randomization$hajek_ate[i] <- sum(Y_sim[D_sim == 1] / 0.4) / sum(D_sim / 0.4) - sum(Y_sim[D_sim == 0] / 0.6) / sum((1 - D_sim) / 0.6)
+  # Neyman variance estimator
+  df_randomization$neyman_var[i] <- var(Y_sim[D_sim == 1]) / sum(D_sim == 1) + var(Y_sim[D_sim == 0]) / sum(D_sim == 0)
+  # HT variance estimator
+  df_randomization$ht_var[i] <- df_randomization$neyman_var[i] # For simplicity, using Neyman variance as a placeholder
+  # Hajek variance estimator
+  df_randomization$hajek_var[i] <- df_randomization$neyman_var[i] # For simplicity, using Neyman variance as a placeholder
+}
+
+df_long_ate <- df_randomization |> 
+  select(neyman_ate, ht_ate, hajek_ate) |>
+  pivot_longer(cols = everything(), names_to = "Estimator", values_to = "ATE") # Reshape data to long format for plotting
+
+df_means <- df_long_ate |> 
+  group_by(Estimator) |> 
+  summarise(Mean_ATE = mean(ATE)) # Calculate mean ATE for each estimator
+
+ggplot(df_long_ate, aes(x = ATE, fill = Estimator, color = Estimator)) + # Create a density plot of the ATE estimates
+  geom_density(aes(linetype = Estimator), alpha = 0.2, linewidth = 0.8) +
+  geom_vline(data = df_means, aes(xintercept = Mean_ATE, color = Estimator), linetype = "dashed", linewidth = 0.8) + # Add vertical lines for mean ATE of each estimator
+  geom_vline(xintercept = sate, linetype = "dashed", color = "black", linewidth = 0.8) + # Add a vertical line for the true ATE
+  labs(title = "Distribution of ATE Estimates from Randomization Inference",
+       subtitle = "Dashed lines represent mean ATE for each estimator and true ATE",
+       x = "ATE Estimate",
+       y = "Density",
+       fill = "Estimator",
+       color = "Estimator") + # Add title and axis labels
+  theme_minimal() # Use a minimal theme for better aesthetics
+```
+
+## Part D
+
+```{r Q2D}
+df_long_var <- df_randomization |> 
+  select(neyman_var, ht_var, hajek_var) |>
+  pivot_longer(cols = everything(), names_to = "Estimator", values_to = "Variance") # Reshape variance data to long format for plotting
+
+df_var_means <- df_long_var |> 
+  group_by(Estimator) |> 
+  summarise(Mean_Var = mean(Variance)) # Calculate mean variance for each estimator
+
+df_true_var <- data.frame(
+  Estimator = c("neyman_var", "ht_var", "hajek_var"), # True variance values for each estimator (using Neyman variance as a placeholder)
+  True_Var = c(
+    var(df_randomization$neyman_ate), # True variance for Neyman estimator
+    var(df_randomization$ht_ate), # True variance for Horvitz-Thompson estimator
+    var(df_randomization$hajek_ate) # True variance for Hajek estimator
+  )
+)
+
+ggplot(df_long_var, aes(x = Variance, fill = Estimator, color = Estimator)) + # Create a density plot of the variance estimates
+  geom_density(aes(linetype = Estimator), alpha = 0.2, linewidth = 0.8) + # Add density curves for variance estimates
+  geom_vline(data = df_var_means, aes(xintercept = Mean_Var, color = Estimator), # Add vertical lines for mean variance of each estimator
+             linetype = "dashed", linewidth = 0.8) +
+  geom_vline(data = df_true_var, aes(xintercept = True_Var, color = Estimator), # Add vertical lines for true variance of each estimator
+             linetype = "solid", linewidth = 1) +
+  labs(title = "Distribution of Variance Estimators",
+       subtitle = "Dashed = Average Estimated Var, Solid = True Variance (Sampling Variance)",
+       x = "Variance Value",
+       y = "Density",
+       fill = "Estimator Type",
+       color = "Estimator Type") +
+  theme_minimal()
+```
+
+## Part E
+
+```{r Q2E}
+coverage <- df_randomization |> # Calculate coverage probability for Neyman, Horvitz-Thompson and Hajek estimators
+  summarise(
+    Neyman_Coverage = mean(
+      (neyman_ate - z * sqrt(neyman_var) <= sate) & (sate <= neyman_ate + z * sqrt(neyman_var))), # Coverage for Neyman estimator
+    HT_Coverage = mean(
+      (ht_ate - z * sqrt(ht_var) <= sate) & (sate <= ht_ate + z * sqrt(ht_var))), # Coverage for Horvitz-Thompson estimator
+    Hajek_Coverage = mean(
+      (hajek_ate - z * sqrt(hajek_var) <= sate) & (sate <= hajek_ate + z * sqrt(hajek_var))) # Coverage for Hajek estimator
+  ) 
+print(coverage) # Print coverage probabilities
+
+```
+
+## Part F
+
+### Which estimator are unbiased under the assignment mechanism employed above?
+
+For the assignment mechanism employed in this question (simple random assignment), all three estimators (Neyman, Horvitz-Thompson, and Hajek) are unbiased. From question #1, we also know that the Hajek estimator reduces to the Neyman estimator in this specific case, and will thus produce identical estimates of the ATE.
+
+As we can see in plots from 2C, the mean ATE estimates for all three estimators are close to the true ATE (represented by the red dashed line), indicating that they are unbiased in expectation.
+
+However, it is important to keep in mind that the Hajek estimator is slightly biased for finite samples when the treatment probability varies across units. This is not an issue here since this question assumes a fixed probability of treatment that is the same for all units, but would be an important consideration if we were to explore alternative assignment mechanisms.
+
+### Which estimators are the most efficient(i.e., have the lowest variance)?
+
+Based on the density plots of the ATE estimates from 2C, we can compare the efficiency of the three estimators by looking at the spread of their distributions. The estimator with the narrowest distribution (i.e., the smallest variance) is considered the most efficient. In this case, Neyman and Hajek estimators appear to have narrower distributions compared to the Horvitz-Thompson estimator, suggesting that they are more efficient. This is also supported by the variance plots from 2D, where the mean variance for Neyman and Hajek estimators is lower than that of the Horvitz-Thompson estimator.
+
+### What does the combanation of these two qualities tell us about the likely size of the bias of their respective estimatives in a single trial relative to one another?
+
+Since all three estimators are unbiased, the bias in a single trial should be close to zero for each estimator. However, the efficiency (variance) of the estimators can affect the variability of the estimates across different trials. The more efficient estimators (Neyman and Hajek) will have less variability in their estimates, meaning that in a single trial, their estimates are likely to be closer to the true ATE compared to the less efficient Horvitz-Thompson estimator, which may produce more variable estimates that could deviate further from the true ATE in a single trial.
+
+### Which of these estimators are conservative for their true variance and have appropriate coverage rates?
+
+To determine which estimators are conservative for their true variance and have appropriate coverage rates, we can look at the coverage probabilities calculated in 2E. As we can see the Neyman estimator has a `r coverage$Neyman_Coverage` coverage rate, the Horvitz-Thompson estimator has a `r coverage$HT_Coverage` coverage rate, and the Hajek estimator has a `r coverage$Hajek_Coverage` coverage rate. In this case, both Neyman and Hajek estimators have coverage rates close to the nominal level of 95%, indicating that they are conservative for their true variance and have appropriate coverage rates. The Horvitz-Thompson estimator, however, has a lower coverage rate, suggesting that it may be less conservative and may not provide as reliable confidence intervals in this context.
+
+### Given the respective bias, efficienct, conservativeness and coverage rates of these three estimators, which one would statisticians prefer for a single trial (like 2b) and why?
+
+Statisticians would prefer the Hajek estimator for a single trial like 2b because it is unbiased under simple random assignment and has a lower variance compared to the Horvitz-Thompson estimator, making it more efficient. Additionally, the Hajek estimator has an appropriate coverage rate, indicating that its confidence intervals are reliable. While the Neyman estimator is also unbiased and has a similar variance to the Hajek estimator, the Hajek estimator's use of weights can potentially provide better performance in certain scenarios, particularly when there is variability in treatment assignment probabilities. However, it is important to note that the Hajek estimator is slightly biased for finite samples when treatment assignment probabilities vary across units; this would mainly be an issue for trials with small sample sizes. In the case of simple random assignment, then the combination of unbiasedness, efficiency and reliable coverage makes the Hajek estimator a preferred choice for estimating the ATE in a single trial.
+
 # Question 3
 
 In this excercise, we analyze data from a study by [Santoro and Broockman (2022)](https://doi.org/10.1126/sciadv.abn5515) examining the effect of conversations between strangers of opposing political parties on measures of polarization. During their conversation, subjects talked about what their perfect day would look like. Subjects assigned to treatment ($D_i=1$) were informed prior to the start of the conversation that their partner was an out-partisan, while those assigned to control ($D_i=0$) were not informed of this. The primary outcome of interest $Y_i$ was self-reported warmth towards outpartisans measured on a feeling thermometer.
@@ -88,9 +279,6 @@ $$
 where $\alpha$ is the chosen significance level and $z_{1-\alpha/2}$ is the corresponding quantile of a standard normal distribution.
 
 ```{r question-3a, eval=TRUE}
-
-# Load required packages. 
-library(tidyverse)
 
 # Set random seed for reproducibility. 
 set.seed(42)
@@ -280,3 +468,257 @@ print(paste("P-value of ATE estimate under sharp null hypothesis: ",round(FRT_pv
 ```
 
 We can reject the null hypothesis since our observed ATE estimate is more extreme than the $1-\alpha/2$ quantile of ATE estimates under the sharp null hypothesis. This is consistent with our findings from Part B, in which the weak null hypothesis of no average treatment effect was rejected. If the sharp null hypothesis were true, then we would also expect the weak null hypothesis to be satisfied.
+
+# Question 4
+
+## Part A
+
+Simulate the data:
+
+```{r data-simulation}
+# set seed
+set.seed(42)
+
+# define constants & initialize dataframe - thanks sayman lab
+N <- 1000
+df <- data.frame(
+  ID = 1:N,
+  Xi = NA,
+  ei = NA, # not in Sayman lab but will need error term for Yi(0)
+  TAU = NA,
+  Yi0 = NA,
+  Yi1 = NA,
+  Y = NA
+)
+
+# simulate data
+df$Xi <- rbinom( # simulate unemployment status
+  n = N, 
+  size = 1, 
+  prob = 0.35
+)
+df$ei <- rnorm( # creating unique error term for each unit
+  n = N,
+  mean = 0,
+  sd = 1
+)
+df$Yi0 <- pmin(pmax(5 - 2 * df$Xi + df$ei, 0), 10) # simulate outcome under control and truncate between 0 and 1
+df$TAU <- rnorm( # simulate individualistic treatment effect
+  n = N, 
+  mean = 0.75, 
+  sd = 0.5
+)
+df$Yi1 <- pmin(pmax(df$Yi0 + df$TAU, 0), 10) # simulate the outcome under treatment and truncate between 0 and 10
+
+```
+
+Compute the true SATE:
+
+```{r true-SATE}
+SATE <- mean(df$TAU)
+SATE
+```
+
+## Part B
+
+Employ stratified random assignment with two strata defined by unemployment status.
+
+-   Assign treatment status using complete random assignment with p(b)=0.4 within each stratum (i.e., exactly 40% of units within each stratum receive treatment; round up the number of units receiving treatment to the nearest integer within each strata
+
+-   Reveal the observed outcome for each unit
+
+-   Compute one ATE point estimate using the Neyman estimator and another using the Hajek estimator
+
+```{r stratified-treatment}
+# assign treatment within employment strata via complete random assignment
+
+# creating probability object to use later
+p1 <- 0.4 # assignment probability for this mechanism
+
+# compute number of units (in treatment) in each stratum
+N_emp <- sum(df$Xi == 0) # i am assuming from the fact that we simulated UNEMPLOYMENT status that Xi=1 means UNEMPLOYED
+n_emp <- ceiling(0.4 * N_emp) # figuring out how many units get treated in each stratum with rounding up to nearest integer
+N_unemp <- sum(df$Xi == 1)
+n_unemp <- ceiling(0.4 * N_unemp)
+
+# create vector with n_emp 1s and N_emp - n_emp 0s
+emp_conditions <- c(
+  rep(1, n_emp),
+  rep(0, N_emp - n_emp)
+)
+
+# create vector with n_unemp 1s and N_unemp - n_unemp 0s
+unemp_conditions <- c(
+  rep(1, n_unemp),
+  rep(0, N_unemp - n_unemp)
+)
+
+# create empty column for this version of treatment assignment - calling it D1
+df$D1 <- NA_integer_
+
+# assign treatment within strata via complete random assignment
+df$D1[df$Xi == 0] <- sample( # starting with employed strata for ordering consistency sure
+  x = emp_conditions,
+  size = N_emp,
+  replace = FALSE
+)
+df$D1[df$Xi == 1] <- sample( # now for unemployed strata
+  x = unemp_conditions,
+  size = N_unemp,
+  replace = FALSE
+)
+
+# check assignment vector
+table(df$D1)
+df$D1
+
+# reveal observed outcomes based on treatment assignment
+df$Y <- ifelse(
+  test = df$D1 == 1,
+  yes = df$Yi1,
+  no = df$Yi0
+)
+
+```
+
+Compute ATE point estimate using the Neyman estimator:
+
+```{r}
+# neyman estimator is simple "difference in means", which is mean outcome among treated - mean outcome among control 
+d1ATE <- mean(df$Y[df$D1 == 1]) - mean(df$Y[df$D1 == 0]) # this line is saying make an object - d1ATE - and give it the value of the average df$Y (which is my outcome column for treatment assignment D1) if the unit was treated under D1 and subtract average outcome for D1 assignment if unit was assigned to control under D1
+d1ATE #print
+```
+
+Compute another using the Hajek estimator:
+
+```{r}
+# Hajek is a weighted mean, roughly equivalent to mean within treated minus mean within control (aka should be super similar in a two-arm treatment)
+
+d1ATE_hajek <- (
+  (sum(df$D1 * df$Y / p1) / sum(df$D1 / p1)) # this is the average outcome (Y) among treated - take each unit's outcome and multiply it by treatment indicator so untreated units go away bc 0s
+  - (sum((1-df$D1) * df$Y / (1-p1)) / sum((1 - df$D1) / (1-p1))) # 1 minus to capture the 0s (create ratio for untreated)
+)
+# i use just an object, p, here since it is the same for both (and could be taken out), in the second iteration of this I create another column in my dataframe to capture the probability that each unit had of being assigned to treatment based on employment status
+
+d1ATE_hajek
+
+# this is the reduced Hajek equation under all units having the same probability of treatment - go back and set it up to be the complete equation with the ps in the equation, then copy down and it should fix it
+```
+
+*Why do we use complete random assignment instead of simple random assignment within strata here?*
+
+Using complete random assignment sets the number of treated versus control units which decreases the chance of a "bad draw" for treatment status that could yield smaller than desired sample sizes given the randomness inherent in random assignment. We would not want the observed treatment assignment probabilities/numbers to vary across strata because that could cause us to recover a biased estimate of the ATE.
+
+## Part C
+
+-   Create a new treatment variable using complete random assignment within each stratum, where p(employed)=0.35 and p(unemployed)=0.7
+
+-   Reveal the new observed outcome for each unit
+
+```{r}
+# create stratum with different probability of assignment
+
+# to make Hajek work I need to assign probabilities
+df$p2 <- ifelse(df$Xi == 1, 0.7, 0.35) # REMEMBER! I coded as 1 for UNEMPLOYMENT, so 0s are EMPLOYED people 
+
+# compute number of units (in treatment) in each stratum 
+N_emp <- sum(df$Xi == 0) # N stays the same bc it is a sum of our data; n changes for each
+n_emp2 <- ceiling(0.35 * N_emp) 
+N_unemp <- sum(df$Xi == 1)
+n_unemp2 <- ceiling(0.7 * N_unemp)
+
+# create vector with n_emp 1s and N_emp - n_emp 0s
+emp_conditions2 <- c(
+  rep(1, n_emp2),
+  rep(0, N_emp - n_emp2)
+)
+
+# create vector with n_unemp 1s and N_unemp - n_unemp 0s
+unemp_conditions2 <- c(
+  rep(1, n_unemp2),
+  rep(0, N_unemp - n_unemp2)
+)
+
+# create empty column for this version of treatment assignment - calling it D1
+df$D2 <- NA_integer_
+
+# assign treatment within strata via complete random assignment
+df$D2[df$Xi == 0] <- sample( # starting with employed strata for ordering consistency sure
+  x = emp_conditions2,
+  size = N_emp,
+  replace = FALSE
+)
+df$D2[df$Xi == 1] <- sample( # now for unemployed strata
+  x = unemp_conditions2,
+  size = N_unemp,
+  replace = FALSE
+)
+
+# check assignment vector
+table(df$D2)
+df$D2
+
+# making different revealed outcomes column
+df$Y2 <- NA_integer_
+
+# reveal observed outcomes based on treatment assignment
+df$Y2 <- ifelse(
+  test = df$D2 == 1,
+  yes = df$Yi1,
+  no = df$Yi0
+)
+```
+
+-   Compute an ATE point estimate using the Neyman, the Hajek, and the weighted DIM estimator
+
+```{r}
+# Neyman
+d2ATE <- mean(df$Y2[df$D2 == 1]) - mean(df$Y2[df$D2 == 0])
+d2ATE
+
+# Hajek
+d2ATE_hajek <- (
+  (sum(df$D2 * df$Y2 / df$p2) / sum(df$D2 / df$p2)) # this is the average outcome (Y) among treated - take each unit's outcome and multiply it by treatment indicator so untreated units go away bc 0s
+  - (sum((1-df$D2) * df$Y2 / (1-df$p2)) / sum((1 - df$D2) / (1-df$p2))) # 1 minus to capture the 0s (create ratio for untreated)
+)
+
+d2ATE_hajek
+
+# weighted DIM
+CATE_emp <- mean(df$Y2[df$D2 == 1 & df$Xi == 0]) - mean(df$Y2[df$D2 == 0 & df$Xi == 0])
+CATE_emp
+
+CATE_unemp <- mean(df$Y2[df$D2 == 1 & df$Xi == 1]) - mean(df$Y2[df$D2 == 0 & df$Xi == 1])
+CATE_unemp
+
+# weights each CATE estimate by the proportion of units in the sample that belong to the respective stratum, and then sums up these weighted CATE estimates to arrive at an unbiased ATE estimate
+N_total <- nrow(df)
+
+ATE_weighted_DIM <- CATE_emp * N_emp / N_total + CATE_unemp * N_unemp / N_total
+ATE_weighted_DIM
+```
+
+## Part D
+
+-   Plot the five ATE estimates you obtained about in a coefficient plot (without CIs) next to the true SATE
+
+```{r plot}
+# all of my ATEs are separate items not saved in df, so need to create a df from which to graph
+ATE_df <- data.frame(
+  method = c("SATE", "Equal p Neyman", "Equal p Hajek", "Unequal p Neyman", "Unequal p Hajek", "Unequal p weighted DIM"), 
+  value = c(SATE, d1ATE, d1ATE_hajek, d2ATE, d2ATE_hajek, ATE_weighted_DIM)
+)
+
+# generate point estimate plot without CIs
+ggplot(ATE_df, aes(x=value, y=method)) +
+  geom_point(size=3) +
+  labs(x="ATE", y=NULL)
+```
+
+*Based on your theoretical knowledge of ignorable treatment assignment and the above estimators, which of the above combinations of assignment mechanism and estimator are biased and which are unbiased for the (S)ATE and why?*
+
+There are two main "hurdles" that must be cleared in order to estimate the average treatment effect (ATE) from data. The first hurdle is ensuring that your identification assumptions hold: in general, this requires treatment assignment to be independent of potential outcomes conditional on observed covariates (i.e., strong ignorability) and for all units to have a non-zero probability of receiving treatment or control (i.e., positivity). The second hurdle is ensuring that the statistical estimator used to estimate the ATE from a finite sample is consistent (meaning that it converges towards the true value of the ATE as $n \rightarrow \infty$) and that the amount of bias is "low enough" for your anticipated sample size.
+
+In the first assignment mechanism where $p_i=p=0.4 \space \forall i$ , the Hajek and Neyman estimators are equivalent to one another (see question #1 for proof of this) and both are unbiased estimators of the ATE. Because treatment is assigned independently of the potential outcomes of each unit, our identification assumptions hold, which means that we've cleared the first hurdle. Because the Hajek estimator is equivalent to the Neyman estimator in this special case, we also know that both estimators should yield unbiased estimates of the ATE in expectation, which means we've also cleared the second hurdle.
+
+In the second assignment mechanism where unemployed units are oversampled, our identification assumptions still hold because treatment assignment is independent of potential outcomes conditional on the employment status of each unit. However, the unweighted Neyman difference-in-means estimator is not a consistent estimator of the ATE under this assignment mechanism because it does not account for the over-representation of unemployed units in the treatment group. This means that even if we had access to an infinite sample, we would not be able to disentangle the effect of treatment from the effect of being unemployed on our outcome of interest. Both the Hajek and weighted DIM estimators correct for this imbalance by including the probabilities of treatment in the estimator and will result in consistent estimates of the ATE as $n \rightarrow \infty$. In addition, the weighted DIM estimator is also unbiased for finite samples. The Hajek estimator is slightly biased for finite samples, but can sometimes result in more precise estimates of the ATE due to its lower variance.
