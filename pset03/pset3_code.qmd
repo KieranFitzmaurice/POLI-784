@@ -1,0 +1,165 @@
+---
+title: "POLI 784 - Problem Set #2"
+author: "Nico Cardenas-Miller, Kieran Fitzmason, Otilda Harris"
+date: today
+format: html
+editor: visual
+---
+
+# Question 1
+
+```{r}
+#| echo: false
+
+# Install required packages if you haven't already
+if (!require("tidyverse")) install.packages("tidyverse")
+if (!require("dagitty")) install.packages("dagitty")
+if (!require("ggdag")) install.packages("ggdag")
+
+# Load packages into environment
+library(tidyverse)
+library(dagitty)
+library(ggdag)
+```
+
+## Part A
+
+Here, we simulate a dataset that includes variables representing our treatment $D$, outcome of interest $Y$, observed covariates $\mathbf{X}$, and an unobserved covariate $U_1$. The causal relationships between these variables is represented below as a directed acyclic graph (DAG).
+
+### DAG representation of causal relationships
+
+```{r}
+
+# Random seed has an effect on the DAG plot.
+# Pick a seed that results in a nice-looking plot. 
+set.seed(1200)
+
+# Represent relationship between variables as a DAG
+dag <- dagify(
+  X1 ~ U1,
+  D ~ X1 + X2, 
+  X3 ~ D,
+  Y ~ D + X3 + X2 + U1,
+  X4 ~ D + Y, 
+  exposure = "D",
+  outcome = "Y",
+  latent = c("U1")
+)
+
+# Styled plot
+ggdag_status(dag) +
+  theme_dag_grey() +
+  labs(title = "Causal DAG")
+```
+
+### Simulated data
+
+```{r}
+
+# Set random seed for reproducibility
+set.seed(42)
+
+## Simulate data
+
+# Specify sample size
+N <- 1000
+
+# Specify direct effect of D on Y
+tau_DY <- 1.0
+
+# Specify indirect effect of D on Y via X3
+tau_DX3 <- 0.5
+tau_X3Y <- 1.0
+
+# Calculate direct and total effect of D on Y
+tau_direct <- tau_DY
+tau_indirect <- tau_DX3*tau_X3Y
+tau_total <- tau_direct + tau_indirect
+
+# Initialize dataframe
+df <- tibble(U1 = rep(NA,N),
+             X1 = NA,
+             X2 = NA,
+             X3 = NA,
+             X4 = NA,
+             D = NA,
+             Y = NA)
+
+# Populate dataframe
+df$U1 <- rbinom(N,1,0.5)
+df$X1 <- 1 + 0.5*df$U1 + rnorm(N,0,1)
+df$X2 <- rbinom(N,1,0.5)
+df$D <- 1.25 + 0.5*df$X1 + 0.25*df$X2 + rnorm(N,0,0.1)
+df$X3 <- 1 + tau_DX3*df$D + rnorm(N,0,0.1)
+df$Y <- 5 + tau_DY*df$D + tau_X3Y*df$X3 + 0.1*df$X2 + 0.1*df$U1 + rnorm(N,0,0.25)
+df$X4 <- -0.5 + 2*df$D + 0.75*df$Y + rnorm(N,0,1)
+
+# Display to console 
+head(df)
+```
+
+## Part B
+
+Here, we estimate the direct effect of $D$ on $Y$ using linear regression. In order to block the back-door paths between $D$ and $Y$, we must condition on $X_1$ and $X_2$ by including them as variables in our regression model. Because we are interested in isolating the direct effect of $D$ on $Y$ we will also condition on $X_3$, which acts as a mediator. This is analogous to asking: how would changing the value of $D$ by one unit affect $Y$ if we were to hold $X_3$ constant?
+
+We can also use the `dagitty::adjustmentSets` function to verify that this is the correct set of variables to condition on given the structure of our causal graph.
+
+```{r}
+
+# Get the set of variables to condition on when estimating the direct effect of D on Y. 
+C_direct <- adjustmentSets(dag,effect="direct")
+print(paste("Conditioning set:",lapply(C_direct, paste, collapse = ",")))
+
+# Estimate direct effect of D on Y 
+model <- lm(Y ~ D + X1 + X2 + X3, data = df)
+tau_direct_hat <- as.numeric(model$coefficients["D"])
+
+# Print results to console
+print(paste("Estimated direct effect of D on Y:",tau_direct_hat))
+print(paste("Actual direct effect of D on Y:",tau_direct))
+```
+
+As shown above, the linear model is able to recover an unbiased estimate of the direct effect of $D$ on $Y$ when we condition on $X_1$, $X_2$, and $X_3$. Our estimated coefficient is not the exact same as the true effect due to the finite sample size, but repeated simulation with different random seeds would show that our estimation approach is unbiased in expectation.
+
+## Part C
+
+Here, we estimate the total effect of $D$ on $Y$. We will condition on $X_1$ and $X_2$ to block the back-door paths between $D$ and $Y$ as we did in part B; however, we will not include $X_3$ in our conditioning set because we are interested in capturing how $D$ impacts $Y$ both directly and through its interactions with mediator variables.
+
+```{r}
+
+# Get the set of variables to condition on when estimating the total effect of D on Y. 
+C_total <- adjustmentSets(dag,effect="total")
+print(paste("Conditioning set:",lapply(C_total, paste, collapse = ",")))
+
+# Estimate total effect of D on Y 
+model <- lm(Y ~ D + X1 + X2, data = df)
+tau_total_hat <- as.numeric(model$coefficients["D"])
+
+# Print results to console
+print(paste("Estimated total effect of D on Y:",tau_total_hat))
+print(paste("Actual total effect of D on Y:",tau_total))
+```
+
+As shown above, the linear model is able to recover an unbiased estimate of the total effect of $D$ on $Y$ when we condition on $X_1$ and $X_2$. Our estimated coefficient is not the exact same as the true effect due to the finite sample size, but repeated simulation with different random seeds would show that our estimation approach is unbiased in expectation.
+
+## Part D
+
+Here, we evaluate the impact of adding a $X_4$ to our conditioning set on estimates of the total effect of $D$ on $Y$.
+
+```{r}
+
+# Print conditioning set
+print("Conditioning set: X1,X2,X4")
+
+# Estimate total effect of D on Y 
+model <- lm(Y ~ D + X1 + X2 + X4, data = df)
+tau_total_hat <- as.numeric(model$coefficients["D"])
+
+# Print results to console
+print(paste("Estimated total effect of D on Y:",tau_total_hat))
+print(paste("Actual total effect of D on Y:",tau_total))
+```
+
+By including $X_4$ in our conditioning set, we have opened up a back-door path between $D$ and $Y$ and introduced bias into our causal effect estimate, which now underestimates the true effect. Previously, this back-door path was blocked because $X_4$ is a collider variable. Overcontrolling for a collider variable in this manner is commonly referred to as "collider bias."
+
+## Part E
