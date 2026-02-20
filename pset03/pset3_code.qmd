@@ -10,6 +10,7 @@ editor: visual
 
 ```{r}
 #| echo: false
+#| include: false
 
 # Install required packages if you haven't already
 if (!require("tidyverse")) install.packages("tidyverse")
@@ -30,12 +31,12 @@ Here, we simulate a dataset that includes variables representing our treatment $
 
 ```{r}
 
-# Random seed has an effect on the DAG plot.
-# Pick a seed that results in a nice-looking plot. 
+# Random seed has an effect on the placement of variables in the DAG plot. 
+# Pick one that makes the DAG look pretty. 
 set.seed(1200)
 
 # Represent relationship between variables as a DAG
-dag <- dagify(
+dag1A <- dagify(
   X1 ~ U1,
   D ~ X1 + X2, 
   X3 ~ D,
@@ -47,9 +48,9 @@ dag <- dagify(
 )
 
 # Styled plot
-ggdag_status(dag) +
-  theme_dag_grey() +
-  labs(title = "Causal DAG")
+ggdag_status(dag1A) +
+  theme_dag() +
+  labs(title = "DAG 1A")
 ```
 
 ### Simulated data
@@ -107,7 +108,7 @@ We can also use the `dagitty::adjustmentSets` function to verify that this is th
 ```{r}
 
 # Get the set of variables to condition on when estimating the direct effect of D on Y. 
-C_direct <- adjustmentSets(dag,effect="direct")
+C_direct <- adjustmentSets(dag1A,effect="direct")
 print(paste("Conditioning set:",lapply(C_direct, paste, collapse = ",")))
 
 # Estimate direct effect of D on Y 
@@ -128,7 +129,7 @@ Here, we estimate the total effect of $D$ on $Y$. We will condition on $X_1$ and
 ```{r}
 
 # Get the set of variables to condition on when estimating the total effect of D on Y. 
-C_total <- adjustmentSets(dag,effect="total")
+C_total <- adjustmentSets(dag1A,effect="total")
 print(paste("Conditioning set:",lapply(C_total, paste, collapse = ",")))
 
 # Estimate total effect of D on Y 
@@ -163,3 +164,68 @@ print(paste("Actual total effect of D on Y:",tau_total))
 By including $X_4$ in our conditioning set, we have opened up a back-door path between $D$ and $Y$ and introduced bias into our causal effect estimate, which now underestimates the true effect. Previously, this back-door path was blocked because $X_4$ is a collider variable. Overcontrolling for a collider variable in this manner is commonly referred to as "collider bias."
 
 ## Part E
+
+Here, we modify the DAG from Part A by (1) removing the direct effect of $D$ on $Y$, (2) removing $X_1$ from the graph, and (3) adding a direct effect of $U_1$ on $D$.
+
+```{r}
+
+# Represent relationship between variables as a DAG
+dag1E <- dagify(
+  D ~ U1 + X2, 
+  X3 ~ D,
+  Y ~ X3 + X2 + U1,
+  X4 ~ D + Y, 
+  exposure = "D",
+  outcome = "Y",
+  latent = c("U1")
+)
+
+# Styled plot
+ggdag_status(dag1E) +
+  theme_dag() +
+  labs(title = "DAG 1E")
+```
+
+In the above DAG, the back-door criterion would tell us that in order to estimate the causal effect of $D$ on $Y$, we must condition on $X_2$ and $U_1$. Both of these variables are confounders (i.e., they influence both the treatment and the outcome); however, only $X_2$ is observed, which means that the back-door criterion fails.
+
+In order to estimate the causal effect of $D$ on $Y$, we need to take a different approach known as the front-door criterion. This involves two steps: (1) estimating the effect of $D$ on $X_3$, without conditioning on any other variables and (2) estimating the effect of $X_3$ on $Y$ while conditioning on $D$. Both of these effects will be unbiased because all back-door paths between $D$ and $X_3$ are blocked by colliders, and $D$ blocks all back-door paths between $X_3$ and $Y$. As such, multiplying these two effects together should give us an unbiased estimate of the effect of $D$ on $Y$.
+
+## Part F
+
+Here, we modify the DAG from Part E by adding an additional latent variable $U_2$ that directly influences both $X_2$ and $Y$.
+
+```{r}
+
+# Represent relationship between variables as a DAG
+dag1F <- dagify(
+  D ~ U1 + X2,
+  X2 ~ U2,
+  X3 ~ D,
+  Y ~ X3 + X2 + U1 + U2,
+  X4 ~ D + Y, 
+  exposure = "D",
+  outcome = "Y",
+  latent = c("U1","U2")
+)
+
+# Styled plot
+ggdag_status(dag1F) +
+  theme_dag() +
+  labs(title = "DAG 1F")
+```
+
+Adding $U_2$ doesn't actually change much: the back-door criterion would still tell us to condition on $X_2$ and $U_1$, which blocks the back-door path passing through $U_2$. As in Part E, the back-door criterion fails since $U_1$ is unobserved, but we can still use the front-door criterion to estimate the causal effect of $D$ on $Y$.
+
+If the new DAG represents the true data-generating process, then this implies that the DAG from Part E is technically not a valid causal DAG—at least not according to the definition given in Chapter 6 of [Hernán and Robins (2020)](https://static1.squarespace.com/static/675db8b0dd37046447128f5f/t/691fb7706ce66332f0b44467/1763686256720/hernanrobins_WhatIf_21nov25.pdf#page=85.00). Their definition states that one of the requirements of a causal graph is that "all common causes, even if unmeasured, of any pair of variables on the graph are themselves on the graph." Because the DAG in Part E omits $U_2$, which is a common cause of $X_2$ and $Y$, it does not meet their definition of a causal graph. However, this is mainly a technical point; even though the DAG in Part E omits $U_2$, it still includes enough relevant variables for us to design a strategy for estimating the effect of $D$ on $Y$.
+
+## Part G
+
+Based on the results of Parts A-F, we can draw the following conclusions:
+
+-   In general, we should always control for confounders since this closes back-door paths.
+
+-   In general, we should never control for colliders as this opens up back-door paths.
+
+-   We should only control for mediators when attempting to isolate direct effects from total effects.
+
+These guidelines assume that our causal DAG is correctly specified and captures all variables that are relevant to the data-generating process (including those that are unobserved). In practice, all models are wrong, and there's always a chance that an important variable or causal relationship was omitted or misspecified. While we can reduce these risks by carefully reviewing the literature and eliciting expert opinion when constructing our DAG, it's impossible to eliminate them completely. As such, it is a good idea to construct multiple DAGs that reflect uncertainties in the structure of the data-generating process. In some cases, it may be possible to design estimation strategies that perform well across multiple representations of the data-generating process.
